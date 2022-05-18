@@ -1,46 +1,57 @@
 class Pizarra extends HTMLElement {
 
     connectedCallback() {
-
+        this.xhr = new XMLHttpRequest();
         this.url = "https://localhost:44338/";
 
-        this.accion = "<i class='fas fa-keyboard'></i>&nbsp;Digitar";
+
         this.innerHTML = `<div class="pizarra">
         <div class="pizarra--header">
-        <h1 class="pizarra-titulo"></h1>
+            <h1 class="pizarra-titulo"></h1>
         </div>
-            <div class="pizarra--body">
-                <canvas data-id="0" class="border border-secondary" width="`+ this.getAttribute("width") + `" height="` + this.getAttribute("height") + `"></canvas>
-                <textarea class="form-control" id="tbArea" rows="3" style="width:`+ this.getAttribute("width") + `px; display:none"></textarea>
-            </div>            
-        
-            <div class="pizarra--footer">
-                <div class="pizarra--actions">
-                    <div class="btn-toolbar mb-3" role="toolbar">
-                        <div class="btn-group me-2" role="group">
-                            
-                            <button type="button" class="btn  btn-sm btn-outline-primary" data-action="change-color"><i class="fas fa-palette"></i>&nbsp;Cambiar color</button>
-                            <button type="button" class="btn  btn-sm btn-outline-secondary" title="Deshacer" data-toggle="tooltip" data-action="undo"><i class="fas fa-undo"></i></button>
-                            <button type="button" class="btn  btn-sm btn-outline-danger" title="Limpiar" data-toggle="tooltip" data-action="clear"><i class="fas fa-broom"></i></button>
-                            
-                        </div>
-                        <div class="btn-group me-3" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-success" data-action="save-data"><i class="fas fa-save"></i>&nbsp;Guardar</button>
-                            
-                        </div>
-                        <div class="btn-group me-4" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="change">`+ this.accion + `</button>
-                        </div>
+        <div class="pizarra--body">
+            <canvas data-idusuario="" data-idejercicio="" class="border border-secondary" width="`+ this.getAttribute("width") + `" height="` + this.getAttribute(" height") + `"></canvas>
+        </div>
+        <div class="pizarra--footer">
+            <div class="pizarra--actions">
+                <div class="btn-toolbar mb-3" role="toolbar">
+                    <div class="btn-group me-2" role="group">
+                        <input type="color" class="form-control form-control-sm form-control-color"
+                            data-action="change-color" id="ColorInput" value="#000000" title="Cambiar color">
+                    </div>
+
+                    <div class="btn-group me-2" role="group">
+                        <button type="button" class="btn  btn-sm btn-outline-secondary" title="Deshacer"
+                            data-toggle="tooltip" data-action="undo"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="btn  btn-sm btn-outline-danger" title="Limpiar"
+                            data-toggle="tooltip" data-action="clear"><i class="fas fa-broom"></i></button>
+
+                    </div>
+
+                    <div class="btn-group me-2" role="group">
+                        <div class="input-group">
+                            <span class="input-group-text" id="basic-addon1"><i class='fas fa-keyboard'></i></span>
+                            <input type="text" class="form-control" placeholder="Escriba acá" aria-label="anotacion" 
+                            aria-describedby="basic-addon1" data-action="write">
+                        </div> 
+                    </div>
+
+                    <div class="btn-group me-2" role="group">
+                        <button type="button" class="btn btn-sm btn-outline-success" data-action="save-data">
+                            <i class="fas fa-save"></i>&nbsp;Guardar</button>
                     </div>
                 </div>
             </div>
-        </div>`;
+        </div>
+    </div>`;
 
         this.canvas = this.querySelector("canvas");
+        this.ctx = this.canvas.getContext('2d');
 
         this.clearButton = this.querySelector("[data-action=clear]");
         this.undoButton = this.querySelector("[data-action=undo]");
         this.changeColorButton = this.querySelector("[data-action=change-color]");
+        this.textField = this.querySelector("[data-action=write]");
         this.saveButton = this.querySelector("[data-action=save-data]");
 
         this.pizarra = ""
@@ -52,7 +63,9 @@ class Pizarra extends HTMLElement {
 
         this.undoButton.addEventListener("click", this.deshacerTrazo.bind(this));
 
-        this.changeColorButton.addEventListener("click", this.cambiaColor.bind(this));
+        this.changeColorButton.addEventListener("input", this.cambiaColor.bind(this));
+
+        this.textField.addEventListener('keyup', this.agregarTexto.bind(this));
 
         window.addEventListener('resize', this.reziseCanvas.bind(this));
     }
@@ -61,20 +74,59 @@ class Pizarra extends HTMLElement {
 
         var usuario = this.getAttribute("usuario");
         var ejercicio = this.getAttribute("ejercicio");
+        var base = this;
+        var data = this.pizarra.toDataURL();
 
-        var data = this.pizarra.toData();
         if (data) {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", this.url + "api/Ejercicio/" + ejercicio);
-
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    console.log(data);
+            this.xhr.open("GET", this.url + "api/Respuesta/ejercicio_usuario?idEjercicio=" + ejercicio + "&idUsuario=" + usuario);
+            this.xhr.onreadystatechange = function () {
+                if (this.readyState === 4) {
+                    var json = JSON.parse(this.responseText);
+                    console.log(json);
+                    if (Array.isArray(json) && json.length > 0) {
+                        base.editarData(ejercicio, usuario, data);
+                    } else {
+                        console.log("nueva");
+                        base.nuevaData(ejercicio, usuario, data);
+                    }
                 }
             };
-
-            xhr.send();
+            this.xhr.send();
         }
+    }
+
+    nuevaData(idej, idusr, data) {
+        this.xhr.open("POST", this.url + "api/Respuesta");
+        this.xhr.setRequestHeader("Content-Type", "application/json");
+        this.xhr.onreadystatechange = function () {
+            if (this.readyState === 4) {
+                //console.log(this.status);
+                //console.log(this.responseText);
+                alert("Guardado");
+            }
+        };
+
+        console.log(data);
+
+
+        var req = '{"idEjercicio": ' + idej + ', "idUsuario": ' + idusr + ', "valor":"' + data + '"}'
+        this.xhr.send(req);
+    }
+
+    editarData(idej, idusr, data) {
+        this.xhr.open("PUT", this.url + "api/Respuesta?idEjercicio=" + idej + "&idUsuario=" + idusr);
+        this.xhr.setRequestHeader("Content-Type", "application/json");
+        this.xhr.onreadystatechange = function () {
+            if (this.readyState === 4) {
+                console.log(this.status);
+                console.log(this.responseText);
+                alert("Actualizado");
+            }
+        };
+
+
+        var req = '{"idEjercicio": ' + idej + ', "idUsuario": ' + idusr + ', "valor":"' + data + '"}'
+        this.xhr.send(req);
     }
 
     limpiarCanvas() {
@@ -85,32 +137,28 @@ class Pizarra extends HTMLElement {
         var usuario = this.getAttribute("usuario");
         var ejercicio = this.getAttribute("ejercicio");
         var titulo = this.querySelector(".pizarra-titulo");
-
-
         this.pizarra = new SignaturePad(this.canvas);
         this.reziseCanvas();
         var c = this.canvas;
         var p = this.pizarra;
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", this.url + "api/Ejercicio/ejercicios_usuario?id=" + ejercicio + "&userId=" + usuario);
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4) {
-                var json = JSON.parse(xhr.responseText);
-                console.log(json);
+        this.xhr.open("GET", this.url + "api/Ejercicio/ejercicios_usuario?id=" + ejercicio + "&userId=" + usuario);
+
+        this.xhr.onreadystatechange = function () {
+            if (this.readyState === 4) {
+                var json = JSON.parse(this.responseText);
                 titulo.innerHTML = json.enunciado;
 
-                if (json.respuestas.lenght > 0) {
+                if (Array.isArray(json.respuestas) && json.respuestas.length > 0) {
+
                     let data = json.respuestas[0];
-                    p.fromData(data.valor);
-                    c.setAttribute('data-id', data.id);
+                    p.fromDataURL(data.valor);
+                    c.setAttribute('data-idusuario', data.idUsuario);
                 }
             }
         };
 
-        xhr.send();
-
-
+        this.xhr.send();
     }
 
     reziseCanvas() {
@@ -132,12 +180,8 @@ class Pizarra extends HTMLElement {
         this.pizarra.clear();
     }
 
-    cambiaColor() {
-        var r = Math.round(Math.random() * 255);
-        var g = Math.round(Math.random() * 255);
-        var b = Math.round(Math.random() * 255);
-        var color = "rgb(" + r + "," + g + "," + b + ")";
-
+    cambiaColor(event) {
+        var color = event.target.value;
         this.pizarra.penColor = color;
     }
 
@@ -149,6 +193,48 @@ class Pizarra extends HTMLElement {
             this.pizarra.fromData(data);
         }
     }
+
+    agregarTexto() {
+        //this.ctx.save();
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+
+        this.ctx.fillStyle = this.changeColorButton.value;
+        this.ctx.font = '16px sans-serif';
+
+
+        this.wrapText(10, 30);
+    }
+
+
+    wrapText(x, y) {
+
+
+        var context = this.ctx;
+        var text = this.textField.value;
+
+        var words = text.split(' ');
+
+        var line = '';
+
+        for (var n = 0; n < words.length; n++) {
+            var testLine = line + words[n] + ' ';
+            var metrics = context.measureText(testLine);
+            var testWidth = metrics.width;
+            if (testWidth > this.getAttribute("width") && n > 0) {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += 25;
+            }
+            else {
+                line = testLine;
+            }
+        }
+        context.fillText(line, x, y);
+
+    }
+
+
 
     disconnectedCallback() {
         this.clearButton.removeEventListener("click", this);
